@@ -1,8 +1,35 @@
+class ShallowGitDownloadStrategy < GitDownloadStrategy
+  private
+
+  def clone_args
+    args = %w[clone --depth 1 --single-branch]
+
+    case @ref_type
+    when :branch, :tag
+      args << "--branch" << @ref
+    end
+
+    args << "--config" << "advice.detachedHead=false"
+    args << "--config" << "core.fsmonitor=false"
+    args << @url << cached_location.to_s
+  end
+
+  def update_repo(timeout: nil)
+    command! "git",
+             args:      ["fetch", "--depth", "1", "origin", @ref],
+             chdir:     cached_location,
+             timeout:   Utils::Timer.remaining(timeout),
+             reset_uid: true
+  end
+end
+
 class MetasploitFramework < Formula
   desc "Penetration testing framework"
   homepage "https://www.metasploit.com/"
   license "BSD-3-Clause"
-  head "https://github.com/rapid7/metasploit-framework.git", branch: "master"
+  head "https://github.com/rapid7/metasploit-framework.git",
+       branch: "master",
+       using:  ShallowGitDownloadStrategy
 
   depends_on "libpcap"
   depends_on "libpq"
