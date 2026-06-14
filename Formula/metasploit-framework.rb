@@ -95,7 +95,7 @@ class MetasploitFramework < Formula
         export GEM_PATH="#{libexec}/gems"
         export BUNDLE_GEMFILE="#{libexec}/Gemfile"
         export PATH="#{Formula["ruby@3.4"].opt_bin}:#{Formula["postgresql@16"].opt_bin}:#{Formula["libpq"].opt_bin}:$PATH"
-        exec "#{Formula["ruby@3.4"].opt_bin}/ruby" "#{libexec}/#{cmd}" "$@"
+        exec "#{Formula["ruby@3.4"].opt_bin}/ruby" -r bundler/setup "#{libexec}/#{cmd}" "$@"
       BASH
     end
   end
