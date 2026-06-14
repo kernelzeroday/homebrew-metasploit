@@ -7,12 +7,12 @@ class MetasploitFramework < Formula
   depends_on "libpcap"
   depends_on "libpq"
   depends_on "libyaml"
+  depends_on :macos
   depends_on "nmap"
   depends_on "openssl@3"
   depends_on "postgresql@16"
   depends_on "ruby@3.4"
   depends_on "sqlite"
-  depends_on :macos
 
   def install
     ENV["GEM_HOME"] = libexec/"gems"
