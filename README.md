@@ -2,17 +2,15 @@
 
 ## A Homebrew tap that should not need to exist.
 
-Apple Silicon Macs have been shipping since **November 2020**. It is now mid-2026. That is over five and a half years. And yet, if you go to [the official Metasploit Homebrew cask](https://formulae.brew.sh/cask/metasploit) right now, you will find:
+As of mid-2026, the [official Metasploit Homebrew cask](https://formulae.brew.sh/cask/metasploit) has three problems:
 
-- An **x86_64-only** prebuilt `.pkg` that requires Rosetta 2 to even launch
-- A deprecation warning because it **fails macOS Gatekeeper** signature checks
-- A scheduled **removal date of 2026-09-01** because nobody upstream can be bothered to fix it
+- It ships an **x86_64-only** prebuilt `.pkg` that requires Rosetta 2 on Apple Silicon
+- It **fails macOS Gatekeeper** signature validation and has been marked deprecated
+- It is **scheduled for removal on 2026-09-01** with no replacement
 
-The most widely used penetration testing framework on the planet — maintained by Rapid7, a publicly traded security company — still cannot ship a working macOS installer for an architecture that Apple has been selling *exclusively* for years. Every Mac sold since 2022 is ARM64. There is no Intel option anymore. And the official distribution answer is "here's an Intel binary, install Rosetta."
+Apple Silicon Macs have been shipping since November 2020. Every Mac sold since late 2022 is ARM64 exclusively. There is no longer an Intel option. Despite this, Rapid7 has not published an ARM64 installer, and Homebrew has not provided a source-build formula as an alternative — just a deprecation notice and a removal date.
 
-Homebrew's response has been to mark the cask as deprecated and schedule it for removal. No source-build formula as a fallback. No outreach to upstream. Just a countdown to deletion.
-
-**This tap fills that gap.** It builds Metasploit Framework from source, from the latest git master, compiling every native extension natively on ARM64. It builds in under two minutes. Every native gem — `eventmachine`, `pg`, `pcaprub`, `nokogiri`, `thin`, `ffi`, `sqlite3` — compiles to ARM64 Mach-O. No Rosetta. No untrusted `.pkg`. No x86 translation layer burning your battery. Just native code running on native hardware, the way it should have been from day one.
+**This tap fills that gap.** It builds Metasploit Framework from source, from the latest git master, compiling every native extension natively on ARM64. It builds in under two minutes. Every native gem — `eventmachine`, `pg`, `pcaprub`, `nokogiri`, `thin`, `ffi`, `sqlite3` — compiles to ARM64 Mach-O. No Rosetta. No unsigned `.pkg`. No translation layer. Native code on native hardware.
 
 ---
 
@@ -36,11 +34,12 @@ The `--HEAD` flag is required. This is a HEAD-only formula — it always builds 
 ## Database setup
 
 ```bash
-brew services start postgresql@16
 msfdb init
 ```
 
-If you had a previous MSF installation (e.g., from that broken cask), you may need `msfdb reinit` instead.
+This creates an embedded PostgreSQL instance in `~/.msf4/db` managed entirely by `msfdb`. You do **not** need to run `brew services start postgresql@16` — the formula depends on `postgresql@16` for its binaries, but MSF runs its own isolated server.
+
+If you had a previous MSF installation (e.g., from the official cask), you may need `msfdb reinit` to replace the old database.
 
 ## Update
 
@@ -58,9 +57,9 @@ All MSF executables, linked into your Homebrew `bin/`:
 
 ---
 
-## How we made this work (and why it was harder than it should have been)
+## How we made this work
 
-This section documents every technical problem we hit and how we solved it, because upstream apparently cannot be bothered and someone should write it down.
+This section documents every technical problem encountered while building this formula and how each was solved.
 
 ### Problem 1: Homebrew downloads the entire 1.2GB repository
 
@@ -75,7 +74,7 @@ def update_repo(timeout: nil)
 end
 ```
 
-That's right. Homebrew will actively undo any attempt to keep the clone small. Helpful.
+Homebrew will actively undo any shallow clone on the next upgrade.
 
 **Our fix:** We define a custom `ShallowGitDownloadStrategy` that subclasses `GitDownloadStrategy` and overrides two methods:
 
@@ -144,7 +143,7 @@ This affects both `eventmachine` and `thin` (which depends on eventmachine).
    ENV["BUNDLE_BUILD__THIN"] = "--with-ssl-dir=#{openssl.opt_prefix} --with-cppflags=-I#{sdk_cxx} --with-cxxflags=-I#{sdk_cxx}"
    ```
 
-Yes, you need all three. The global flags handle most gems. The `BUNDLE_BUILD__` flags handle gems whose extconf.rb overrides the global environment. Belt, suspenders, and duct tape — because eventmachine 1.2.7 was released in 2017 and its build system reflects that era.
+All three are necessary. The global flags handle most gems, but the `BUNDLE_BUILD__` flags are needed for gems whose `extconf.rb` overrides the global environment. `eventmachine` 1.2.7 was released in 2017 and its build system does not account for modern macOS SDK layouts.
 
 ### Problem 3: Native gems can't find keg-only Homebrew dependencies
 
@@ -232,7 +231,7 @@ This forces Bundler to set up the load path before the script's own `require` st
 
 ### Problem 7: brew audit is pedantic about dependency ordering
 
-Homebrew's linter (`brew audit`) requires `depends_on` lines to be sorted alphabetically. Symbol dependencies like `:macos` are sorted as their string equivalent — so `:macos` sorts as `"macos"` and goes between `"libyaml"` and `"nmap"`, not at the beginning or end of the list. Getting this wrong produces audit errors that block formula acceptance. This is documented nowhere; you find out by failing the audit three times.
+Homebrew's linter (`brew audit`) requires `depends_on` lines to be sorted alphabetically. Symbol dependencies like `:macos` are sorted as their string equivalent — so `:macos` sorts as `"macos"` and goes between `"libyaml"` and `"nmap"`, not at the beginning or end of the list. Getting this wrong produces audit errors. This sorting behavior is not documented in the Homebrew formula cookbook.
 
 ---
 
