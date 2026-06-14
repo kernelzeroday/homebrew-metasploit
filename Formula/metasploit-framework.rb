@@ -4,15 +4,15 @@ class MetasploitFramework < Formula
   license "BSD-3-Clause"
   head "https://github.com/rapid7/metasploit-framework.git", branch: "master"
 
-  depends_on "ruby@3.4"
-  depends_on "postgresql@16"
-  depends_on "libpq"
+  depends_on :macos
   depends_on "libpcap"
-  depends_on "sqlite"
-  depends_on "openssl@3"
+  depends_on "libpq"
   depends_on "libyaml"
   depends_on "nmap"
-  depends_on :macos
+  depends_on "openssl@3"
+  depends_on "postgresql@16"
+  depends_on "ruby@3.4"
+  depends_on "sqlite"
 
   def install
     ENV["GEM_HOME"] = libexec/"gems"
